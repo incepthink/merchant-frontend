@@ -3,7 +3,7 @@ import axios from "axios";
 export const backendUrl =
   process.env.NODE_ENV === "production"
     ? "https://api.hashcase.co"
-    : "http://localhost:8000";
+    : "http://localhost:8001";
 const apiKey =
   process.env.NODE_ENV === "production"
     ? process.env.NEXT_PUBLIC_MERCHANT_API_KEY
