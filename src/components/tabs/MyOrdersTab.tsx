@@ -2,34 +2,38 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Cookies from "js-cookie";
-import client from "@/utils/sdk";
-import type { OrderWithDetails } from "@hashcase/merchant-sdk";
 import { getRewardLabel } from "@/utils/rewardLabel";
+import axiosInstance from "@/utils/axios";
+import { useMerchantStore } from "@/context/merchantStore";
+import { getMerchantSession } from "@/utils/merchantSession";
+
+type OrderWithDetails = {
+  id: number;
+  bill_amount?: string | number | null;
+  status?: string;
+  createdAt: string;
+  selected_loyalty?: { value: number } | null;
+  selected_reward?: {
+    type: string;
+    point_cost?: number;
+    discountType?: string | null;
+    discountValue?: string | number | null;
+    productName?: string | null;
+  } | null;
+};
 
 export default function MyOrdersTab() {
   const router = useRouter();
+  const merchantId = useMerchantStore((state) => state.merchantId);
   const [orders, setOrders] = useState<OrderWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<"generic" | null>(null);
 
   const fetchOrders = async () => {
-    const raw = Cookies.get("merchant_user");
-    if (!raw) {
-      router.push("/login");
-      return;
-    }
-
-    let user: { id?: number; merchant_id?: number } = {};
-    try {
-      user = JSON.parse(raw);
-    } catch {
-      router.push("/login");
-      return;
-    }
-
+    const user = getMerchantSession();
     const userId = user?.id;
-    if (!userId) {
+    const selectedMerchantId = merchantId ?? user?.merchant_id;
+    if (!userId || !selectedMerchantId) {
       router.push("/login");
       return;
     }
@@ -38,8 +42,10 @@ export default function MyOrdersTab() {
     setError(null);
 
     try {
-      const data = await client.users.getOrders(userId);
-      setOrders(data);
+      const response = await axiosInstance.get(
+        `/user/merchant/orders/${selectedMerchantId}/${userId}`,
+      );
+      setOrders(response.data.data ?? []);
     } catch {
       setError("generic");
     } finally {
@@ -49,7 +55,7 @@ export default function MyOrdersTab() {
 
   useEffect(() => {
     fetchOrders();
-  }, []);
+  }, [merchantId]);
 
   if (loading) {
     return (
@@ -107,8 +113,9 @@ export default function MyOrdersTab() {
           day: "numeric",
           year: "numeric",
         });
+        const status = order.status?.toLowerCase() ?? "";
         const colorClass =
-          statusColor[order.status?.toLowerCase()] ?? "text-gray-400";
+          statusColor[status] ?? "text-gray-400";
 
         return (
           <div

@@ -2,11 +2,20 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Cookies from "js-cookie";
 import { Gift, RefreshCw } from "lucide-react";
-import client from "@/utils/sdk";
-import type { Reward } from "@hashcase/merchant-sdk";
 import { getRewardLabel } from "@/utils/rewardLabel";
+import axiosInstance from "@/utils/axios";
+import { useMerchantStore } from "@/context/merchantStore";
+import { getMerchantSession } from "@/utils/merchantSession";
+
+type Reward = {
+  id: number;
+  type: string;
+  discountType?: string | null;
+  discountValue?: string | number | null;
+  productName?: string | null;
+  can_claim?: boolean;
+};
 
 interface RewardsState {
   claimed: Reward[];
@@ -15,28 +24,17 @@ interface RewardsState {
 
 export default function ActivityTab() {
   const router = useRouter();
+  const merchantId = useMerchantStore((state) => state.merchantId);
   const [rewards, setRewards] = useState<RewardsState>({ claimed: [], pending: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
   const fetchGrantedRewards = async () => {
-    const raw = Cookies.get("merchant_user");
-    if (!raw) {
-      router.push("/login");
-      return;
-    }
-
-    let user: { id?: number; merchant_id?: number } = {};
-    try {
-      user = JSON.parse(raw);
-    } catch {
-      router.push("/login");
-      return;
-    }
-
+    const user = getMerchantSession();
     const userId = user?.id;
+    const selectedMerchantId = merchantId ?? user?.merchant_id;
 
-    if (!userId) {
+    if (!userId || !selectedMerchantId) {
       router.push("/login");
       return;
     }
@@ -45,8 +43,18 @@ export default function ActivityTab() {
     setError(false);
 
     try {
-      const data = await client.users.getRewards(userId);
-      setRewards({ claimed: data.claimed_rewards, pending: data.pending_rewards });
+      const [claimedResponse, pendingResponse] = await Promise.all([
+        axiosInstance.get("/user/merchant/granted-rewards", {
+          params: { user_id: userId, merchant_id: selectedMerchantId },
+        }),
+        axiosInstance.get("/user/merchant/rewards", {
+          params: { user_id: userId, merchant_id: selectedMerchantId },
+        }),
+      ]);
+      setRewards({
+        claimed: claimedResponse.data.data ?? [],
+        pending: pendingResponse.data.data ?? [],
+      });
     } catch {
       setError(true);
     } finally {
@@ -56,7 +64,7 @@ export default function ActivityTab() {
 
   useEffect(() => {
     fetchGrantedRewards();
-  }, []);
+  }, [merchantId]);
 
   if (loading) {
     return (

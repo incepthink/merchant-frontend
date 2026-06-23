@@ -2,36 +2,39 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Cookies from "js-cookie";
-import client from "@/utils/sdk";
-import type { UserDetail } from "@hashcase/merchant-sdk";
 import axiosInstance from "@/utils/axios";
+import { useMerchantStore } from "@/context/merchantStore";
+import { getMerchantSession } from "@/utils/merchantSession";
+
+type MerchantTier = {
+  name: string;
+  minValue: number;
+};
+
+type MerchantSummary = {
+  balance: number;
+  tier_points: number;
+  enrolled_at: string;
+  total_points_earned: number;
+  total_points_spent: number;
+  current_tier?: MerchantTier | null;
+  points_until_next_tier?: number | null;
+};
 
 export default function SummaryTab() {
   const router = useRouter();
-  const [data, setData] = useState<UserDetail | null>(null);
+  const merchantId = useMerchantStore((state) => state.merchantId);
+  const [data, setData] = useState<MerchantSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<"not_enrolled" | "generic" | null>(null);
   const [currentStreak, setCurrentStreak] = useState(0);
 
   const fetchPoints = async () => {
-    const raw = Cookies.get("merchant_user");
-    if (!raw) {
-      router.push("/login");
-      return;
-    }
-
-    let user: { id?: number; merchant_id?: number } = {};
-    try {
-      user = JSON.parse(raw);
-    } catch {
-      router.push("/login");
-      return;
-    }
-
+    const user = getMerchantSession();
     const userId = user?.id;
+    const selectedMerchantId = merchantId ?? user?.merchant_id;
 
-    if (!userId) {
+    if (!userId || !selectedMerchantId) {
       router.push("/login");
       return;
     }
@@ -40,13 +43,16 @@ export default function SummaryTab() {
     setError(null);
 
     try {
-      const data = await client.users.get(userId);
-      setData(data);
+      const response = await axiosInstance.get("/user/merchant/points", {
+        params: { user_id: userId, merchant_id: selectedMerchantId },
+      });
+      setData(response.data.data);
 
-      const streakResponse = await axiosInstance.get(
-        "/merchant/extend-streak",
+      const streakResponse = await axiosInstance.post(
+        "/user/merchant/extend-streak",
+        null,
         {
-          params: { user_id: userId },
+          params: { user_id: userId, merchant_id: selectedMerchantId },
         },
       );
       setCurrentStreak(streakResponse.data.user_achievements.current_streak);
@@ -66,7 +72,7 @@ export default function SummaryTab() {
 
   useEffect(() => {
     fetchPoints();
-  }, []);
+  }, [merchantId]);
   if (loading) {
     return (
       <div className="p-4 space-y-4 font-quantico animate-pulse">
@@ -154,14 +160,14 @@ export default function SummaryTab() {
         {data.current_tier &&
           (() => {
             const pct =
-              data.points_to_next_tier === null
+              data.points_until_next_tier === null
                 ? 100
                 : Math.min(
                     100,
                     ((data.balance - data.current_tier.minValue) /
                       (data.balance -
                         data.current_tier.minValue +
-                        data.points_to_next_tier)) *
+                        (data.points_until_next_tier ?? 0))) *
                       100,
                   );
             return (
@@ -173,9 +179,9 @@ export default function SummaryTab() {
                   />
                 </div>
                 <p className="text-white text-lg mt-2 text-right">
-                  {data.points_to_next_tier === null
+                  {data.points_until_next_tier === null
                     ? "Max Tier"
-                    : `${data.points_to_next_tier?.toLocaleString()} points to next tier`}
+                    : `${data.points_until_next_tier?.toLocaleString()} points to next tier`}
                 </p>
               </div>
             );
