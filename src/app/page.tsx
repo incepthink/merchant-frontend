@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Tabs, Tab, Box, Button } from "@mui/material";
 import Cookies from "js-cookie";
@@ -38,45 +38,51 @@ function TabsLayout() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { merchantId, setMerchantId } = useMerchantStore();
+  const [sessionReady, setSessionReady] = useState(false);
 
   useEffect(() => {
-    // Initialize merchantId from cookie on mount
-    const raw = Cookies.get("merchant_user");
-    if (!raw) {
-      router.push("/login");
-      return;
-    }
-    try {
-      const user = JSON.parse(raw);
-      if (!user?.id) {
+    const initializeSession = async () => {
+      const raw = Cookies.get("merchant_user");
+      if (!raw) {
         router.push("/login");
         return;
       }
-      if (user.merchant_id) {
-        setMerchantId(user.merchant_id);
-      }
-    } catch {
-      router.push("/login");
-      return;
-    }
 
-    // Fetch merchant list
-    axiosInstance
-      .get("/platform/merchant")
-      .then((res) => {
+      try {
+        const user = JSON.parse(raw);
+        if (!user?.id) {
+          router.push("/login");
+          return;
+        }
+
+        if (user.merchant_id) {
+          setMerchantId(user.merchant_id);
+          setSessionReady(true);
+          return;
+        }
+
+        const res = await axiosInstance.get("/platform/merchant");
         const active = res.data.data.filter(
           (m: { status: string }) => m.status === "active",
         );
-        // If no merchant selected yet, default to the first active one
-        const raw2 = Cookies.get("merchant_user");
-        if (raw2) {
-          const user2 = JSON.parse(raw2);
-          if (!user2.merchant_id && active.length > 0) {
-            setMerchantId(active[0].id);
-          }
+
+        if (!active[0]?.id) {
+          router.push("/login");
+          return;
         }
-      })
-      .catch(() => {});
+
+        const nextUser = { ...user, merchant_id: active[0].id };
+        Cookies.set("merchant_user", JSON.stringify(nextUser), {
+          expires: new Date(Date.now() + 4 * 60 * 60 * 1000),
+        });
+        setMerchantId(active[0].id);
+        setSessionReady(true);
+      } catch {
+        router.push("/login");
+      }
+    };
+
+    initializeSession();
   }, []);
 
   const param = searchParams.get("tab") as TabValue | null;
@@ -93,9 +99,14 @@ function TabsLayout() {
     Cookies.remove("owner_cap_id");
     Cookies.remove("jwt");
     Cookies.remove("api_key");
+    Cookies.remove("merchant_user");
 
     window.location.href = "/login";
   };
+
+  if (!sessionReady) {
+    return null;
+  }
 
   return (
     <Box sx={{ width: "100%", pt: 10 }}>

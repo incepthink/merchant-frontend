@@ -29,9 +29,24 @@ const Login = () => {
         password: loginForm.password,
       });
 
+      const session = { ...response.data.data };
+      if (!session.merchant_id) {
+        const merchantsResponse = await axiosInstance.get("/platform/merchant");
+        const activeMerchant = merchantsResponse.data.data.find(
+          (merchant: { id: number; status: string }) =>
+            merchant.status === "active",
+        );
+
+        if (!activeMerchant?.id) {
+          throw new Error("No active merchant is available for this account");
+        }
+
+        session.merchant_id = activeMerchant.id;
+      }
+
       Cookies.set(
         "merchant_user",
-        JSON.stringify(response.data.data),
+        JSON.stringify(session),
         {
           expires: new Date(Date.now() + 4 * 60 * 60 * 1000),
         },
