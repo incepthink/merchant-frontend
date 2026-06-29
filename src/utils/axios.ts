@@ -1,4 +1,5 @@
 import axios from "axios";
+import Cookies from "js-cookie";
 
 export const backendUrl =
   process.env.NODE_ENV === "production"
@@ -15,5 +16,23 @@ const axiosInstance = axios.create({
     "x-api-key": apiKey,
   },
 });
+
+axiosInstance.interceptors.request.use((config) => {
+  const token = Cookies.get("jwt");
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
+axiosInstance.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const requestUrl = error.config?.url ?? "";
+    if (error.response?.status === 401 && requestUrl.startsWith("/user/merchant/order") && typeof window !== "undefined") {
+      ["owner_id", "owner_cap_id", "jwt", "api_key", "merchant_user"].forEach((key) => Cookies.remove(key));
+      window.location.assign("/login");
+    }
+    return Promise.reject(error);
+  },
+);
 
 export default axiosInstance;

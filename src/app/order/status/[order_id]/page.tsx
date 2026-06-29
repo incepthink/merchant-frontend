@@ -20,7 +20,7 @@ interface Order {
   reward: { type: string; discountType: string; discountValue: string; productName: string | null } | null;
   user: { name?: string; email: string } | null;
   merchant: { name: string };
-  payment_method: { type: string; card_number: string | null; card_type: string | null; network: string | null; upi_id: string | null; linked_bank: string | null } | null;
+  payment_method: { type: string; card_type: string | null; network: string | null; linked_bank: string | null; last_four: string | null; upi_handle: string | null } | null;
 }
 
 export default function OrderStatusPage() {
@@ -65,8 +65,9 @@ export default function OrderStatusPage() {
 
 function formatPayment(payment: Order["payment_method"]) {
   if (!payment) return "—";
-  if (payment.card_number) return `${payment.network?.toUpperCase() ?? payment.type.toUpperCase()} ${payment.card_type?.toUpperCase() ?? ""} **********${payment.card_number.slice(-4)}`.trim();
-  return `${payment.type.toUpperCase()} ${payment.upi_id ?? ""}`.trim();
+  if (payment.last_four) return `${payment.network?.toUpperCase() ?? payment.type.toUpperCase()} ${payment.card_type?.toUpperCase() ?? ""} **********${payment.last_four}`.trim();
+  if (payment.type === "upi") return payment.upi_handle ? `UPI ••••@${payment.upi_handle}` : "UPI";
+  return payment.type.toUpperCase();
 }
 function Detail({ label, value, mono, bold }: { label: string; value: string; mono?: boolean; bold?: boolean }) {
   return <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-4 py-3"><dt className="text-text-muted">{label}</dt><dd className={`text-right text-text-primary ${mono ? "font-mono text-xs" : ""} ${bold ? "text-base font-semibold tnum" : ""}`}>{value}</dd></div>;

@@ -15,7 +15,7 @@ type OrderWithDetails = {
   bill_amount?: string | number | null;
   status?: string;
   createdAt: string;
-  payment_method?: { type?: string | null; card_number?: string | null; card_type?: string | null; network?: string | null; upi_id?: string | null; linked_bank?: string | null } | null;
+  payment_method?: { type?: string | null; card_type?: string | null; network?: string | null; linked_bank?: string | null; last_four?: string | null; upi_handle?: string | null } | null;
   loyalty?: { code?: string | null; value: number } | null;
   reward?: Reward | null;
   selected_loyalty?: { code?: string | null; value: number } | null;
@@ -29,11 +29,11 @@ function formatAmount(amount: OrderWithDetails["bill_amount"]) {
 
 function formatPaymentMethod(paymentMethod: OrderWithDetails["payment_method"]) {
   if (!paymentMethod) return "Payment method not set";
-  if (paymentMethod.card_number) {
+  if (paymentMethod.last_four) {
     const network = paymentMethod.network?.toUpperCase() ?? paymentMethod.type?.toUpperCase() ?? "CARD";
-    return `${network} **********${paymentMethod.card_number.slice(-4)}`;
+    return `${network} **********${paymentMethod.last_four}`;
   }
-  if (paymentMethod.upi_id) return `UPI ${paymentMethod.upi_id}`;
+  if (paymentMethod.type === "upi") return paymentMethod.upi_handle ? `UPI ••••@${paymentMethod.upi_handle}` : "UPI";
   return paymentMethod.type?.toUpperCase() ?? "Payment method not set";
 }
 

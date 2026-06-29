@@ -30,7 +30,9 @@ export default function Login() {
         if (!activeMerchant?.id) throw new Error("No active merchant is available for this account");
         session.merchant_id = activeMerchant.id;
       }
-      Cookies.set("merchant_user", JSON.stringify(session), { expires: new Date(Date.now() + 4 * 60 * 60 * 1000) });
+      const cookieOptions = { expires: new Date(Date.now() + 4 * 60 * 60 * 1000), sameSite: "strict" as const, secure: process.env.NODE_ENV === "production" };
+      Cookies.set("merchant_user", JSON.stringify(session), cookieOptions);
+      Cookies.set("jwt", response.data.token, cookieOptions);
       notifyResolve(notifyId, "Login successful! Redirecting...", "success");
       window.setTimeout(() => router.push("/"), 1000);
     } catch (error: any) {
