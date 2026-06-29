@@ -1,134 +1,53 @@
 "use client";
 
-import React, { useState, ChangeEvent } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import axiosInstance from "@/utils/axios";
 import Cookies from "js-cookie";
+import { ArrowRight, Lock, Mail } from "lucide-react";
+import axiosInstance from "@/utils/axios";
 import { notifyPromise, notifyResolve } from "@/utils/notify";
-const Login = () => {
+import { AuthLayout } from "@/components/customer/AuthLayout";
+import { Field, PrimaryAction } from "@/components/customer/Primitives";
+
+export default function Login() {
   const router = useRouter();
+  const [form, setForm] = useState({ email: "", password: "" });
+  const [submitting, setSubmitting] = useState(false);
+  const isValid = Boolean(form.email && form.password);
 
-  const [loginForm, setLoginForm] = useState({
-    email: "",
-    password: "",
-  });
-
-  const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setLoginForm((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const isFormValid = loginForm.email && loginForm.password;
-
-  const handleLogin = async () => {
+  const handleLogin = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!isValid || submitting) return;
+    setSubmitting(true);
     const notifyId = notifyPromise("Logging in, please hold on...", "info");
     try {
-      const response = await axiosInstance.post("/auth/merchant/user/login", {
-        email: loginForm.email,
-        password: loginForm.password,
-      });
-
+      const response = await axiosInstance.post("/auth/merchant/user/login", form);
       const session = { ...response.data.data };
       if (!session.merchant_id) {
         const merchantsResponse = await axiosInstance.get("/platform/merchant");
-        const activeMerchant = merchantsResponse.data.data.find(
-          (merchant: { id: number; status: string }) =>
-            merchant.status === "active",
-        );
-
-        if (!activeMerchant?.id) {
-          throw new Error("No active merchant is available for this account");
-        }
-
+        const activeMerchant = merchantsResponse.data.data.find((merchant: { id: number; status: string }) => merchant.status === "active");
+        if (!activeMerchant?.id) throw new Error("No active merchant is available for this account");
         session.merchant_id = activeMerchant.id;
       }
-
-      Cookies.set(
-        "merchant_user",
-        JSON.stringify(session),
-        {
-          expires: new Date(Date.now() + 4 * 60 * 60 * 1000),
-        },
-      );
-
+      Cookies.set("merchant_user", JSON.stringify(session), { expires: new Date(Date.now() + 4 * 60 * 60 * 1000) });
       notifyResolve(notifyId, "Login successful! Redirecting...", "success");
-
-      setTimeout(() => {
-        router.push("/");
-      }, 1000);
+      window.setTimeout(() => router.push("/"), 1000);
     } catch (error: any) {
       const status = error?.response?.status;
-      const apiMessage = error?.response?.data?.message;
-      const message =
-        apiMessage ||
-        (status === 404
-          ? "User not found"
-          : status === 401
-            ? "Invalid password"
-            : "Login failed");
+      const message = error?.response?.data?.message || (status === 404 ? "User not found" : status === 401 ? "Invalid password" : "Login failed");
       notifyResolve(notifyId, message, "error");
+      setSubmitting(false);
     }
   };
 
   return (
-    <div className="flex justify-center items-center gap-4 lg:gap-8 w-full h-screen font-quantico">
-      <div className="flex flex-col justify-center items-start gap-4 px-4 w-full lg:w-1/2 h-full">
-        <h2 className="text-4xl font-bold mx-auto mb-8">Login</h2>
-
-        <div className="space-y-2 w-full">
-          <label htmlFor="email" className="text-lg">
-            Email: <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="email"
-            name="email"
-            className="border border-[#2D3748] px-4 py-2 w-full outline-none rounded"
-            placeholder="Enter email..."
-            value={loginForm.email}
-            onChange={handleInputChange}
-            required
-          />
-        </div>
-
-        <div className="space-y-2 w-full">
-          <label htmlFor="password" className="text-lg">
-            Password: <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="password"
-            name="password"
-            className="border border-[#2D3748] px-4 py-2 w-full outline-none rounded"
-            placeholder="Enter password..."
-            value={loginForm.password}
-            onChange={handleInputChange}
-            required
-          />
-        </div>
-
-        <div className="text-sm text-blue-500 flex flex-col">
-          <Link href="/signin" className="mt-2">
-            New User? Sign up
-          </Link>
-        </div>
-
-        <div className="flex gap-5 w-full lg:w-1/4">
-          <button
-            type="button"
-            className={`text-[#E6FFFA] text-lg px-6 py-2 rounded w-full transition-colors ${
-              isFormValid
-                ? "bg-[#2979FF] cursor-pointer"
-                : "bg-gray-400 cursor-not-allowed"
-            }`}
-            onClick={handleLogin}
-            disabled={!isFormValid}
-          >
-            Login
-          </button>
-        </div>
-      </div>
-    </div>
+    <AuthLayout title="Login" subtitle="Sign in to access your loyalty account." footer={<p className="text-sm text-text-secondary">New user? <Link href="/signin" className="text-text-primary underline-offset-4 hover:underline">Sign up</Link></p>}>
+      <form onSubmit={handleLogin} className="space-y-4">
+        <Field label="Email" name="email" type="email" autoComplete="email" placeholder="you@domain.com" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} trailing={<Mail className="size-4 text-text-muted" aria-hidden />} required />
+        <Field label="Password" name="password" type="password" autoComplete="current-password" placeholder="••••••••" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} trailing={<Lock className="size-4 text-text-muted" aria-hidden />} required />
+        <PrimaryAction fullWidth loading={submitting} disabled={!isValid} type="submit">{submitting ? "Signing in…" : "Login"}{!submitting && <ArrowRight className="size-4" aria-hidden />}</PrimaryAction>
+      </form>
+    </AuthLayout>
   );
-};
-
-export default Login;
+}
