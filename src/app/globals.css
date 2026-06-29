@@ -1,81 +1,122 @@
-@import "tailwindcss";
+@import "tailwindcss" source(none);
+@source "../";
 
-body {
-  background-color: #00041F;
-  color: white;
-  font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
-    "Segoe UI", sans-serif;
-  -webkit-font-smoothing: antialiased;
-  text-rendering: geometricPrecision;
+@theme inline {
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --radius-xl: 22px;
+  --radius-2xl: 28px;
+  --radius-3xl: 32px;
+
+  --color-background: var(--background);
+  --color-foreground: var(--text-primary);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-surface-raised: var(--surface-raised);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-border-subtle: var(--border-subtle);
+  --color-border-strong: var(--border-strong);
+  --color-accent-indigo: var(--accent-indigo);
+  --color-accent-violet: var(--accent-violet);
+  --color-accent-coral: var(--accent-coral);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
-input, textarea, select {
-  background-color: white;
-  color: black;
+:root {
+  --background: #08070d;
+  --surface-1: #100f17;
+  --surface-2: #171520;
+  --surface-3: #211e2d;
+  --surface-raised: #282438;
+  --text-primary: #f8f7fb;
+  --text-secondary: #c2bdca;
+  --text-muted: #958fa1;
+  --border-subtle: rgba(255, 255, 255, 0.09);
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --accent-indigo: #5748e8;
+  --accent-violet: #9139e6;
+  --accent-coral: #e96781;
+  --success: #43d69b;
+  --warning: #f2bb5c;
+  --danger: #ff747f;
+  --gradient-primary: linear-gradient(120deg, #5146e5 0%, #8b35e8 55%, #e96781 100%);
+  --gradient-card: linear-gradient(135deg, #2a1e5e 0%, #6a2cb5 45%, #d9536f 100%);
+  --gradient-card-soft: linear-gradient(135deg, rgba(81, 70, 229, 0.18) 0%, rgba(139, 53, 232, 0.14) 55%, rgba(233, 103, 129, 0.18) 100%);
+  --shadow-card: 0 30px 60px -30px rgba(120, 40, 200, 0.55), 0 8px 24px -12px rgba(0, 0, 0, 0.6);
+  --shadow-surface: 0 12px 32px -16px rgba(0, 0, 0, 0.7);
 }
 
-.hidden-scrollbar::-webkit-scrollbar {
-  display: none !important;
+@layer base {
+  *,
+  *::before,
+  *::after {
+    border-color: var(--border-subtle);
+  }
+
+  html,
+  body {
+    background-color: var(--background);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: "cv11", "ss01";
+  }
+
+  body { min-height: 100dvh; }
+  button, [role="button"] { cursor: pointer; }
+  button:disabled { cursor: not-allowed; }
+
+  :focus-visible {
+    outline: 2px solid var(--accent-violet);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  ::selection {
+    background: rgba(139, 53, 232, 0.35);
+    color: var(--text-primary);
+  }
+
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  input:-webkit-autofill:active {
+    -webkit-text-fill-color: var(--text-primary) !important;
+    caret-color: var(--text-primary);
+    box-shadow: 0 0 0 1000px var(--surface-2) inset !important;
+    -webkit-box-shadow: 0 0 0 1000px var(--surface-2) inset !important;
+    transition: background-color 9999s ease-out 0s;
+  }
 }
 
-/* Add to your global CSS file */
-.slider-thumb::-webkit-slider-thumb {
-  appearance: none;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: #2979FF;
-  cursor: pointer;
-  box-shadow: 0 0 2px rgba(0, 0, 0, 0.5);
+@utility gradient-primary { background-image: var(--gradient-primary); }
+@utility gradient-card { background-image: var(--gradient-card); }
+@utility surface-1 { background-color: var(--surface-1); }
+@utility surface-2 { background-color: var(--surface-2); }
+@utility surface-3 { background-color: var(--surface-3); }
+@utility surface-raised { background-color: var(--surface-raised); }
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
 }
 
-.slider-thumb::-moz-range-thumb {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: #2979FF;
-  cursor: pointer;
-  border: none;
-  box-shadow: 0 0 2px rgba(0, 0, 0, 0.5);
-}
-
-.slider-thumb::-webkit-slider-thumb:hover {
-  background: #1d5bbf;
-  box-shadow: 0 0 0 8px rgba(41, 121, 255, 0.16);
-}
-
-.slider-thumb::-moz-range-thumb:hover {
-  background: #1d5bbf;
-  box-shadow: 0 0 0 8px rgba(41, 121, 255, 0.16);
-}
-
-@keyframes gradient-flow {
-  from { transform: translateX(0); }
-  to   { transform: translateX(-50%); }
-}
-
-.progress-gradient {
-  position: relative;
-  overflow: hidden;
-}
-
-.progress-gradient::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 200%;
-  height: 100%;
-  background: linear-gradient(
-    90deg,
-    #2979FF 0%,
-    #00C6FF 16.67%,
-    #a78bfa 33.33%,
-    #2979FF 50%,
-    #00C6FF 66.67%,
-    #a78bfa 83.33%,
-    #2979FF 100%
-  );
-  animation: gradient-flow 2s linear infinite;
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }

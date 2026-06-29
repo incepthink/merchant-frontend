@@ -1,212 +1,100 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import { Check, ChevronDown, Search, Store } from "lucide-react";
 import axiosInstance from "@/utils/axios";
+import { useMerchantStore } from "@/context/merchantStore";
 
 interface Merchant {
   id: number;
   name: string;
-  email: string;
-  webhook_url: string | null;
   status: string;
 }
 
-interface MerchantDropdownProps {
-  value: number | "";
-  onChange: (id: number | "") => void;
-}
-
-const MerchantDropdown = ({ value, onChange }: MerchantDropdownProps) => {
+export default function MerchantDropdown({ value, onChange }: { value: number | ""; onChange: (id: number | "") => void }) {
   const [merchants, setMerchants] = useState<Merchant[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const containerRef = useRef<HTMLDivElement>(null);
-  const searchRef = useRef<HTMLInputElement>(null);
+  const [activeIdx, setActiveIdx] = useState(0);
+  const setMerchantList = useMerchantStore((state) => state.setMerchantList);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const popRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const listboxId = useId();
 
   useEffect(() => {
-    axiosInstance
-      .get("/platform/merchant")
+    axiosInstance.get("/platform/merchant")
       .then((res) => {
-        const all: Merchant[] = res.data.data;
-        const active = all.filter((m) => m.status === "active").reverse();
+        const active = (res.data.data as Merchant[]).filter((merchant) => merchant.status === "active").reverse();
         setMerchants(active);
-        if (active.length > 0) onChange(active[0].id);
+        setMerchantList(active);
+        if (active.length > 0 && (!value || !active.some((merchant) => merchant.id === value))) onChange(active[0].id);
       })
-      .catch(() => {
-        setMerchants([]);
-      })
+      .catch(() => { setMerchants([]); setMerchantList([]); })
       .finally(() => setLoading(false));
   }, []);
 
-  // Close on outside click
-  useEffect(() => {
-    const handleMouseDown = (e: MouseEvent) => {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(e.target as Node)
-      ) {
-        setOpen(false);
-        setSearch("");
-      }
-    };
-    document.addEventListener("mousedown", handleMouseDown);
-    return () => document.removeEventListener("mousedown", handleMouseDown);
-  }, []);
+  const filtered = merchants.filter((merchant) => merchant.name.toLowerCase().includes(search.toLowerCase()));
+  const selected = merchants.find((merchant) => merchant.id === value) ?? null;
 
-  // Focus search input when opening
+  useEffect(() => {
+    if (!open) return;
+    const onDocumentClick = (event: MouseEvent) => {
+      if (!popRef.current?.contains(event.target as Node) && !btnRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDocumentClick);
+    return () => document.removeEventListener("mousedown", onDocumentClick);
+  }, [open]);
+
   useEffect(() => {
     if (open) {
-      setTimeout(() => searchRef.current?.focus(), 50);
+      setSearch("");
+      setActiveIdx(0);
+      window.setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [open]);
 
-  const selected = merchants.find((m) => m.id === value) ?? null;
-  const filtered = merchants.filter((m) =>
-    m.name.toLowerCase().includes(search.toLowerCase()),
-  );
-
-  const handleSelect = (id: number) => {
+  const choose = (id: number) => {
     onChange(id);
     setOpen(false);
-    setSearch("");
+    btnRef.current?.focus();
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (loading) return;
-    if (e.key === "Enter" || e.key === " ") {
-      if (!open) {
-        setOpen(true);
-      }
-      e.preventDefault();
-    } else if (e.key === "Escape") {
-      setOpen(false);
-      setSearch("");
-      containerRef.current?.focus();
-    } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-      e.preventDefault();
-      if (!open) {
-        setOpen(true);
-        return;
-      }
-      const options =
-        containerRef.current?.querySelectorAll<HTMLLIElement>("li[tabindex]");
-      if (!options || options.length === 0) return;
-      const focused = document.activeElement as HTMLElement;
-      const list = Array.from(options);
-      const idx = list.indexOf(focused as HTMLLIElement);
-      if (e.key === "ArrowDown") {
-        (list[idx + 1] ?? list[0]).focus();
-      } else {
-        (list[idx - 1] ?? list[list.length - 1]).focus();
-      }
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    if (!open && (event.key === "Enter" || event.key === " " || event.key === "ArrowDown")) {
+      event.preventDefault();
+      setOpen(true);
+      return;
     }
+    if (!open) return;
+    if (event.key === "Escape") { setOpen(false); btnRef.current?.focus(); }
+    else if (event.key === "ArrowDown") { event.preventDefault(); setActiveIdx((index) => Math.min(index + 1, filtered.length - 1)); }
+    else if (event.key === "ArrowUp") { event.preventDefault(); setActiveIdx((index) => Math.max(index - 1, 0)); }
+    else if (event.key === "Enter") { event.preventDefault(); const merchant = filtered[activeIdx]; if (merchant) choose(merchant.id); }
   };
 
   return (
-    <div className="space-y-2 w-full min-w-50">
-      <div
-        ref={containerRef}
-        className="relative w-full outline-none"
-        tabIndex={0}
-        onKeyDown={handleKeyDown}
-      >
-        {/* Trigger button */}
-        <div
-          onClick={() => !loading && setOpen((o) => !o)}
-          className={`
-            relative cursor-pointer select-none
-            bg-[#1C1F2D] rounded-md
-            h-[42px] leading-[40px]
-            px-[18px] pr-[30px]
-            text-sm font-normal text-left text-white
-            transition-all duration-200
-            ${
-              open
-                ? "border border-[#2979FF] shadow-[inset_0_1px_4px_rgba(0,0,0,0.3)]"
-                : "border border-[#474F71] shadow-[0px_2px_5px_0px_rgba(0,0,0,0.4)]"
-            }
-            ${loading ? "opacity-60 cursor-not-allowed" : ""}
-          `}
-        >
-          <span className={selected ? "text-white" : "text-[#6B7280]"}>
-            {loading
-              ? "Loading..."
-              : selected
-                ? selected.name
-                : "Select Merchant"}
-          </span>
-          {/* Chevron */}
-          <span
-            className={`
-              absolute right-[10px] top-1/2
-              w-0 h-0
-              border-l-[4px] border-l-transparent
-              border-r-[4px] border-r-transparent
-              border-t-[4px] border-t-[#9CA3AF]
-              transition-transform duration-[125ms]
-              ${open ? "-translate-y-1/2 rotate-180" : "-translate-y-1/2"}
-            `}
-          />
-        </div>
+    <div className="relative inline-block w-full max-w-xs" onKeyDown={handleKeyDown}>
+      <button ref={btnRef} type="button" aria-haspopup="listbox" aria-expanded={open} aria-controls={listboxId} aria-label={selected ? `Active merchant: ${selected.name}` : "Select merchant"} onClick={() => !loading && setOpen((current) => !current)} className="group flex h-11 w-full min-w-0 items-center gap-2.5 rounded-2xl border border-border-subtle bg-surface-1 px-3 text-left text-sm text-text-primary transition-colors hover:border-border-strong disabled:opacity-60" disabled={loading}>
+        <span className="grid size-7 shrink-0 place-items-center rounded-lg gradient-card text-white"><Store className="size-3.5" aria-hidden /></span>
+        <span className="min-w-0 flex-1"><span className="block text-[10px] uppercase tracking-[0.14em] text-text-muted">Membership at</span><span className="block truncate font-medium leading-tight">{loading ? "Loading…" : selected?.name ?? "Select merchant"}</span></span>
+        <ChevronDown className={`size-4 shrink-0 text-text-muted transition-transform duration-200 ${open ? "rotate-180" : ""}`} aria-hidden />
+      </button>
 
-        {/* Dropdown list */}
-        <div
-          className={`
-            absolute top-full left-0 right-0 z-[999]
-            bg-[#1C1F2D] border border-[#474F71] rounded-md
-            shadow-[0_8px_24px_rgba(0,0,0,0.5)]
-            mt-1 py-[3px]
-            max-h-[250px] overflow-auto
-            transition-all duration-150 origin-top
-            ${open ? "scale-100 opacity-100 pointer-events-auto" : "scale-75 opacity-0 pointer-events-none"}
-          `}
-        >
-          {/* Search */}
-          <div className="flex items-center justify-center m-2">
-            <input
-              ref={searchRef}
-              type="text"
-              autoComplete="off"
-              placeholder="Search..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => e.stopPropagation()}
-              className="w-[90%] px-2 py-2 bg-[#00041F] border border-[#474F71] rounded focus:border-[#2979FF] outline-none text-sm text-white placeholder-[#6B7280]"
-            />
-          </div>
-
-          {/* Options */}
-          <ul className="p-0 m-0 list-none">
-            {filtered.map((m) => (
-              <li
-                key={m.id}
-                tabIndex={open ? 0 : -1}
-                onClick={() => handleSelect(m.id)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleSelect(m.id);
-                }}
-                className={`
-                  px-[18px] pr-[29px] h-[40px] leading-[40px]
-                  text-sm text-left cursor-pointer outline-none
-                  transition-colors duration-200
-                  hover:bg-[#2979FF]/20 focus:bg-[#2979FF]/20
-                  ${value === m.id ? "font-semibold text-[#2979FF]" : "font-normal text-white"}
-                `}
-              >
-                {m.name}
-              </li>
-            ))}
-            {filtered.length === 0 && (
-              <li className="px-[18px] h-[40px] leading-[40px] text-sm text-[#6B7280]">
-                No results
-              </li>
-            )}
+      {open && (
+        <div ref={popRef} className="absolute left-0 right-0 top-[calc(100%+8px)] z-50 overflow-hidden rounded-2xl border border-border-subtle bg-surface-2 shadow-[0_24px_48px_-16px_rgba(0,0,0,0.7)]" role="dialog">
+          <div className="flex items-center gap-2 border-b border-border-subtle px-3 py-2.5"><Search className="size-4 text-text-muted" aria-hidden /><input ref={inputRef} type="text" value={search} onChange={(event) => { setSearch(event.target.value); setActiveIdx(0); }} placeholder="Search merchants" aria-label="Search merchants" className="h-9 min-w-0 flex-1 bg-transparent text-sm text-text-primary outline-none placeholder:text-text-muted" /></div>
+          <ul id={listboxId} role="listbox" aria-label="Merchants" className="max-h-72 overflow-y-auto py-1.5">
+            {filtered.length === 0 && <li className="px-4 py-6 text-center text-sm text-text-muted">{merchants.length === 0 ? "No merchants available" : "No matches"}</li>}
+            {filtered.map((merchant, index) => {
+              const isSelected = merchant.id === value;
+              const isActive = index === activeIdx;
+              return <li key={merchant.id} role="option" aria-selected={isSelected}><button type="button" onMouseEnter={() => setActiveIdx(index)} onClick={() => choose(merchant.id)} className={`flex min-h-11 w-full items-center gap-3 px-3 text-left text-sm transition-colors ${isActive ? "surface-3" : ""} ${isSelected ? "text-text-primary" : "text-text-secondary"}`}><span className="grid size-7 shrink-0 place-items-center rounded-lg bg-surface-raised text-text-primary"><Store className="size-3.5" aria-hidden /></span><span className="min-w-0 flex-1 truncate">{merchant.name}</span>{isSelected && <Check className="size-4 shrink-0 text-accent-coral" aria-hidden />}</button></li>;
+            })}
           </ul>
         </div>
-      </div>
+      )}
     </div>
   );
-};
-
-export default MerchantDropdown;
+}
