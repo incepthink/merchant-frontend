@@ -2,15 +2,17 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Tabs, Tab, Box, Button } from "@mui/material";
 import Cookies from "js-cookie";
 import SummaryTab from "@/components/tabs/SummaryTab";
 import MyOrdersTab from "@/components/tabs/MyOrdersTab";
 import ActivityTab from "@/components/tabs/ActivityTab";
 import ProfileTab from "@/components/tabs/ProfileTab";
-import MerchantDropdown from "@/components/MerchantDropdown";
 import axiosInstance from "@/utils/axios";
 import { useMerchantStore } from "@/context/merchantStore";
+import {
+  CustomerAppShell,
+  type CustomerTab,
+} from "@/components/customer/AppShell";
 
 const TABS = [
   { label: "Summary", value: "summary" },
@@ -90,10 +92,6 @@ function TabsLayout() {
     ? (param as TabValue)
     : "summary";
 
-  const handleChange = (_: React.SyntheticEvent, value: TabValue) => {
-    router.push(`?tab=${value}`);
-  };
-
   const handleLogout = () => {
     Cookies.remove("owner_id");
     Cookies.remove("owner_cap_id");
@@ -109,86 +107,22 @@ function TabsLayout() {
   }
 
   return (
-    <Box sx={{ width: "100%", pt: 10 }}>
-      <div className="flex justify-between mb-8">
-        {/* Merchant selector */}
-        <Box>
-          <MerchantDropdown
-            value={merchantId ?? ""}
-            onChange={(id) => {
-              if (id !== "") setMerchantId(id);
-            }}
-          />
-        </Box>
-        <button
-          onClick={handleLogout}
-          className="bg-[#2563EB] px-4 py-2 rounded-md"
-        >
-          LOGOUT
-        </button>
-      </div>
-
-      <Tabs
-        value={activeTab}
-        onChange={handleChange}
-        sx={{
-          borderBottom: "1px solid #1e2a4a",
-          "& .MuiTabs-flexContainer": {
-            flexWrap: { xs: "wrap", sm: "nowrap" },
-          },
-          "& .MuiTab-root": {
-            flex: { xs: "0 0 50%", sm: 1 },
-            color: "#9ca3af",
-            textTransform: "none",
-            fontSize: "0.95rem",
-            "&.Mui-selected": {
-              color: "#ffffff",
-            },
-          },
-          "& .MuiTabs-indicator": {
-            backgroundColor: "#2979FF",
-            display: { xs: "none", sm: "block" },
-          },
-        }}
-      >
-        {TABS.map((tab) => (
-          <Tab key={tab.value} label={tab.label} value={tab.value} />
-        ))}
-      </Tabs>
-
-      <Box sx={{ pt: 2, minHeight: "400px" }}>
-        <TabContent key={merchantId ?? "none"} tab={activeTab} />
-      </Box>
-
-      <Box sx={{ pt: 4, pb: 4 }}>
-        <Button
-          variant="contained"
-          fullWidth
-          size="large"
-          onClick={() => router.push("/order")}
-          sx={{
-            backgroundColor: "#2979FF",
-            "&:hover": { backgroundColor: "#1a5fd4" },
-            borderRadius: 2,
-            py: 1.5,
-            fontSize: "1rem",
-            fontWeight: 600,
-            textTransform: "none",
-          }}
-        >
-          Checkout
-        </Button>
-      </Box>
-    </Box>
+    <CustomerAppShell
+      activeTab={activeTab as CustomerTab}
+      merchantId={merchantId}
+      onMerchantChange={setMerchantId}
+      onTabChange={(tab) => router.push(`?tab=${tab}`)}
+      onLogout={handleLogout}
+    >
+      <TabContent key={merchantId ?? "none"} tab={activeTab} />
+    </CustomerAppShell>
   );
 }
 
 export default function Home() {
   return (
-    <div className="min-h-screen px-4 py-6 max-w-2xl mx-auto">
-      <Suspense fallback={null}>
-        <TabsLayout />
-      </Suspense>
-    </div>
+    <Suspense fallback={null}>
+      <TabsLayout />
+    </Suspense>
   );
 }

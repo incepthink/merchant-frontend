@@ -2,139 +2,65 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Gift, RefreshCw } from "lucide-react";
+import { Gift, Lock, Sparkles, Tag } from "lucide-react";
 import { getRewardLabel } from "@/utils/rewardLabel";
 import axiosInstance from "@/utils/axios";
 import { useMerchantStore } from "@/context/merchantStore";
 import { getMerchantSession } from "@/utils/merchantSession";
+import { EmptyState, ErrorState, SkeletonSurface, StatusBadge } from "@/components/customer/Primitives";
 
-type Reward = {
-  id: number;
-  type: string;
-  discountType?: string | null;
-  discountValue?: string | number | null;
-  productName?: string | null;
-  can_claim?: boolean;
-};
-
-interface RewardsState {
-  claimed: Reward[];
-  pending: Reward[];
-}
+type Reward = { id: number; type: string; point_cost?: number; discountType?: string | null; discountValue?: string | number | null; productName?: string | null; can_claim?: boolean; required_tier?: { name?: string } | null };
 
 export default function ActivityTab() {
   const router = useRouter();
   const merchantId = useMerchantStore((state) => state.merchantId);
-  const [rewards, setRewards] = useState<RewardsState>({ claimed: [], pending: [] });
+  const [rewards, setRewards] = useState<{ claimed: Reward[]; pending: Reward[] }>({ claimed: [], pending: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
-  const fetchGrantedRewards = async () => {
+  const fetchRewards = async () => {
     const user = getMerchantSession();
-    const userId = user?.id;
     const selectedMerchantId = merchantId ?? user?.merchant_id;
-
-    if (!userId || !selectedMerchantId) {
-      router.push("/login");
-      return;
-    }
-
+    if (!user?.id || !selectedMerchantId) { router.push("/login"); return; }
     setLoading(true);
     setError(false);
-
     try {
       const [claimedResponse, pendingResponse] = await Promise.all([
-        axiosInstance.get("/user/merchant/granted-rewards", {
-          params: { user_id: userId, merchant_id: selectedMerchantId },
-        }),
-        axiosInstance.get("/user/merchant/rewards", {
-          params: { user_id: userId, merchant_id: selectedMerchantId },
-        }),
+        axiosInstance.get("/user/merchant/granted-rewards", { params: { user_id: user.id, merchant_id: selectedMerchantId } }),
+        axiosInstance.get("/user/merchant/rewards", { params: { user_id: user.id, merchant_id: selectedMerchantId } }),
       ]);
-      setRewards({
-        claimed: claimedResponse.data.data ?? [],
-        pending: pendingResponse.data.data ?? [],
-      });
-    } catch {
-      setError(true);
-    } finally {
-      setLoading(false);
-    }
+      setRewards({ claimed: claimedResponse.data.data ?? [], pending: pendingResponse.data.data ?? [] });
+    } catch { setError(true); }
+    finally { setLoading(false); }
   };
 
-  useEffect(() => {
-    fetchGrantedRewards();
-  }, [merchantId]);
-
-  if (loading) {
-    return (
-      <div className="p-4 space-y-3 animate-pulse font-quantico">
-        <div className="h-6 w-32 bg-[#1C1F2D] rounded" />
-        {[0, 1, 2].map((i) => (
-          <div
-            key={i}
-            className="h-12 rounded-lg bg-[#0A0E2A] border border-[#1e2a4a]"
-          />
-        ))}
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="p-4 flex flex-col items-center justify-center gap-2 text-center font-quantico min-h-50">
-        <p className="text-sm text-gray-400">Failed to load activity.</p>
-        <button
-          onClick={fetchGrantedRewards}
-          className="flex items-center gap-1.5 text-xs text-[#2979FF] hover:underline cursor-pointer"
-        >
-          <RefreshCw size={13} />
-          Retry
-        </button>
-      </div>
-    );
-  }
-
-  if (rewards.claimed.length === 0 && rewards.pending.length === 0) {
-    return (
-      <div className="p-4 flex flex-col items-center justify-center gap-2 text-center font-quantico min-h-50">
-        <Gift size={32} className="text-gray-600" />
-        <p className="text-sm text-gray-500">No rewards claimed yet.</p>
-      </div>
-    );
-  }
-
-  const renderReward = (reward: Reward) => (
-    <div
-      key={reward.id}
-      className="flex items-center gap-3 bg-[#0A0E2A] border border-[#1e2a4a] rounded-lg px-4 py-3"
-    >
-      <Gift size={16} className="text-[#2979FF] shrink-0" />
-      <span className="text-sm text-gray-200">
-        {getRewardLabel({
-          type: reward.type,
-          discountType: reward.discountType,
-          discountValue: reward.discountValue?.toString(),
-          productName: reward.productName,
-        })}
-      </span>
-    </div>
-  );
+  useEffect(() => { fetchRewards(); }, [merchantId]);
 
   return (
-    <div className="p-4 space-y-5 font-quantico">
-      {rewards.claimed.length > 0 && (
-        <div className="space-y-2">
-          <h2 className="text-xl font-semibold">Rewards Claimed</h2>
-          <div className="space-y-2">{rewards.claimed.map(renderReward)}</div>
-        </div>
-      )}
-      {rewards.pending.length > 0 && (
-        <div className="space-y-2">
-          <h2 className="text-xl font-semibold">Pending Rewards</h2>
-          <div className="space-y-2">{rewards.pending.map(renderReward)}</div>
-        </div>
-      )}
+    <div>
+      <header className="mb-6"><h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Rewards</h1><p className="mt-1 text-sm text-text-secondary">Your available and claimed loyalty rewards.</p></header>
+      {loading && <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{Array.from({ length: 6 }).map((_, index) => <SkeletonSurface key={index} className="h-64" />)}</div>}
+      {!loading && error && <ErrorState title="Rewards unavailable" description="Failed to load your rewards." onRetry={fetchRewards} />}
+      {!loading && !error && rewards.claimed.length === 0 && rewards.pending.length === 0 && <EmptyState icon={Sparkles} title="No rewards available yet" description="Your rewards will appear here when they become available." />}
+      {!loading && !error && (rewards.pending.length > 0 || rewards.claimed.length > 0) && <>{rewards.pending.length > 0 && <RewardSection title="Available"><div className="grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-3">{rewards.pending.map((reward) => <RewardCard key={reward.id} reward={reward} />)}</div></RewardSection>}{rewards.claimed.length > 0 && <RewardSection title="Claimed"><div className="grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-3">{rewards.claimed.map((reward) => <RewardCard key={reward.id} reward={reward} claimed />)}</div></RewardSection>}</>}
     </div>
+  );
+}
+
+function RewardSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return <section className="mt-8 first:mt-0"><h2 className="mb-3 text-sm font-medium uppercase tracking-[0.16em] text-text-muted">{title}</h2>{children}</section>;
+}
+
+function RewardCard({ reward, claimed = false }: { reward: Reward; claimed?: boolean }) {
+  const locked = reward.can_claim === false && !claimed;
+  const Icon = reward.type.includes("FREE") ? Gift : reward.type.includes("BOGO") ? Sparkles : Tag;
+  const label = getRewardLabel({ ...reward, discountValue: reward.discountValue?.toString() });
+  return (
+    <article className={`min-w-0 max-w-full rounded-3xl border border-border-subtle bg-surface-1 p-4 transition-colors ${locked ? "opacity-70" : ""}`}>
+      <div className="flex h-full min-w-0 flex-col">
+        <div className="relative grid h-32 w-full min-w-0 place-items-center overflow-hidden rounded-2xl" style={{ backgroundImage: locked ? "linear-gradient(135deg, #1d1a2b, #2a2640)" : "var(--gradient-card)" }} aria-hidden><Icon className={`size-9 ${locked ? "text-text-muted" : "text-white"}`} />{locked && <div className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-black/40 px-2 py-1 text-[10px] uppercase tracking-wider text-white/80"><Lock className="size-3" />Locked</div>}</div>
+        <div className="mt-4 min-w-0 flex-1"><div className="flex min-w-0 items-start justify-between gap-2"><h3 className="min-w-0 flex-1 truncate text-[15px] font-medium text-text-primary">{reward.productName ?? label}</h3><span className="shrink-0"><StatusBadge status={claimed ? "claimed" : locked ? "unavailable" : "available"} /></span></div><p className="mt-1 line-clamp-2 break-words text-sm text-text-secondary">{label}</p><div className="mt-3 flex min-w-0 flex-wrap items-center gap-3 text-xs text-text-muted">{reward.point_cost != null && <span className="tnum">{reward.point_cost.toLocaleString()} pts</span>}{reward.required_tier?.name && <span>· {reward.required_tier.name} tier</span>}</div></div>
+      </div>
+    </article>
   );
 }
